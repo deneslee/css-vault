@@ -100,7 +100,7 @@ export default function SnippetCard({ snippet, theme, activeTag, onTagSelect, on
 
   return (
     <article
-      className="card rounded-md border border-base-content/10 bg-base-100 shadow-md transition-[box-shadow,border-color] duration-200 hover:border-primary/40 hover:shadow-xl hover:ring-2 hover:ring-primary/40"
+      className="card rounded-md border border-base-content/10 bg-base-100 shadow-md transition-[box-shadow,border-color] duration-0 hover:border-primary/40 hover:shadow-xl hover:ring-2 hover:ring-primary/40"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
