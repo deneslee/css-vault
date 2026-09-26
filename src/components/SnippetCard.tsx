@@ -202,6 +202,7 @@ export function SnippetCard({
             step="0.1"
             value={speed}
             onChange={(e) => setSpeed(parseFloat(e.target.value))}
+            onInput={(e) => setSpeed(parseFloat((e.target as HTMLInputElement).value))}
           />
         </label>
         <button
