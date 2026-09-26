@@ -1,25 +1,17 @@
-import { defineCollection } from "astro:content";
-import { z } from "astro/zod";
+// src/content.config.ts
+import { defineCollection, z } from "astro:content";
 import { glob } from "astro/loaders";
 
 const snippets = defineCollection({
-  loader: glob({
-    pattern: ["**/*.{md,mdx}", "!**/*.template.{md,mdx}", "!**/_*.{md,mdx}"],
-    base: "./src/content/snippets",
-  }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/snippets" }),
   schema: z.object({
-    title: z.string(),
-    category: z.enum([
-      "Sprites & Pixel Art",
-      "Loaders & Spinners",
-      "Buttons",
-      "Glow & Glass",
-    ]),
-    tags: z.array(z.string()).default([]),
-    cssCode: z.string(),
-    htmlCode: z.string().optional(),
-    reactCode: z.string(),
-    defaultSpeed: z.number().default(0.8),
+    title: z.string(), //[cite: 1]
+    category: z.string(), //[cite: 1]
+    tags: z.array(z.string()).default([]), //[cite: 1]
+    defaultSpeed: z.number().default(1), //[cite: 1]
+    cssCode: z.string(), //[cite: 1]
+    htmlCode: z.string(), //[cite: 1]
+    reactCode: z.string(), //[cite: 1]
   }),
 });
 

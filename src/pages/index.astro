@@ -1,126 +1,30 @@
 ---
 // src/pages/index.astro
-import Layout from "../layouts/Layout.astro";
 import { getCollection } from "astro:content";
-import { SnippetCard } from "../components/SnippetCard";
-import "../styles/snippet-card.css";
+import SnippetGallery from "../components/SnippetGallery";
+import "../styles/global.css";
 
-const allSnippets = await getCollection("snippets");
-const categories = ["All", ...new Set(allSnippets.map((s) => s.data.category))];
+const rawSnippets = await getCollection("snippets");
+
+const snippets = rawSnippets.map((entry) => ({
+  id: entry.id,
+  title: entry.data.title, //[cite: 1]
+  category: entry.data.category, //[cite: 1]
+  tags: entry.data.tags, //[cite: 1]
+  defaultSpeed: entry.data.defaultSpeed, //[cite: 1]
+  cssCode: entry.data.cssCode, //[cite: 1]
+  htmlCode: entry.data.htmlCode, //[cite: 1]
+  reactCode: entry.data.reactCode, //[cite: 1]
+}));
 ---
 
-<Layout title="Animated CSS Vault">
-  <main class="vault-container">
-    <header class="vault-header">
-      <h1>Interactive Animation Vault</h1>
-      <p>
-        Test animation speed, toggle React vs CSS, and grab production-ready
-        code.
-      </p>
-
-      <div class="filter-controls">
-        <input
-          type="search"
-          id="search-input"
-          placeholder="Filter by title or tag..."
-          aria-label="Filter animations"
-        />
-        <select id="category-filter" aria-label="Select Category">
-          {categories.map((cat) => <option value={cat}>{cat}</option>)}
-        </select>
-      </div>
-    </header>
-
-    <div class="card-grid" id="grid">
-      {
-        allSnippets.map((snippet) => (
-          <div
-            class="card-wrapper"
-            data-title={snippet.data.title.toLowerCase()}
-            data-category={snippet.data.category}
-            data-tags={snippet.data.tags.join(",")}
-          >
-            <SnippetCard
-              client:visible
-              title={snippet.data.title}
-              category={snippet.data.category}
-              cssCode={snippet.data.cssCode}
-              htmlCode={snippet.data.htmlCode}
-              reactCode={snippet.data.reactCode}
-              defaultSpeed={snippet.data.defaultSpeed}
-            />
-          </div>
-        ))
-      }
-    </div>
-  </main>
-</Layout>
-
-<script>
-  const searchInput = document.getElementById(
-    "search-input"
-  ) as HTMLInputElement;
-  const categoryFilter = document.getElementById(
-    "category-filter"
-  ) as HTMLSelectElement;
-  const cards = document.querySelectorAll<HTMLElement>(".card-wrapper");
-
-  function filterCards() {
-    const query = searchInput.value.toLowerCase().trim();
-    const category = categoryFilter.value;
-
-    cards.forEach((card) => {
-      const title = card.dataset.title || "";
-      const cardCategory = card.dataset.category || "";
-      const tags = card.dataset.tags || "";
-
-      const matchesText = title.includes(query) || tags.includes(query);
-      const matchesCategory = category === "All" || cardCategory === category;
-
-      card.style.display = matchesText && matchesCategory ? "block" : "none";
-    });
-  }
-
-  searchInput.addEventListener("input", filterCards);
-  categoryFilter.addEventListener("change", filterCards);
-</script>
-
-<style>
-  .vault-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2.5rem 1.5rem 5rem 1.5rem;
-  }
-  .vault-header h1 {
-    font-size: 2rem;
-    margin: 0 0 0.5rem 0;
-    color: #f8fafc;
-  }
-  .vault-header p {
-    color: #94a3b8;
-    margin: 0 0 1.5rem 0;
-  }
-  .filter-controls {
-    display: flex;
-    gap: 1rem;
-    max-width: 600px;
-  }
-  #search-input,
-  #category-filter {
-    background: #111827;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #f8fafc;
-    border-radius: 8px;
-    padding: 0.6rem 1rem;
-    outline: none;
-  }
-  #search-input {
-    flex: 1;
-  }
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 1.5rem;
-    margin-top: 2rem;
-  }
-</style>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CSS Vault</title>
+  </head>
+  <body>
+    <SnippetGallery snippets={snippets} client:load />
+  </body>
+</html>

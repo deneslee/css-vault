@@ -1,266 +1,213 @@
 // src/components/SnippetCard.tsx
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useId } from "react";
 
-interface SnippetCardProps {
+export interface SnippetData {
+  id: string;
   title: string;
   category: string;
-  cssCode: string;
-  reactCode: string;
-  htmlCode?: string;
-  defaultSpeed?: number;
-}
-
-function normalizeCss(css: string): string {
-  return css
-    .replace(/\/assets\/src\/assets\//g, "/assets/")
-    .replace(/\/src\/assets\//g, "/assets/");
-}
-
-function getFallbackHtml(title: string, category: string, cssCode: string): string {
-  const match = cssCode.match(/\.([a-zA-Z0-9_-]+)/);
-  const className = match ? match[1] : "snippet-preview";
-  if (
-    category === "Buttons" ||
-    className.toLowerCase().includes("btn") ||
-    className.toLowerCase().includes("button")
-  ) {
-    return `<button class="${className}">${title}</button>`;
-  }
-  return `<div class="${className}"></div>`;
-}
-
-function ShadowPreviewStage({
-  cssCode,
-  htmlCode,
-  speed,
-  isPaused,
-}: {
+  tags: string[];
+  defaultSpeed: number;
   cssCode: string;
   htmlCode: string;
-  speed: number;
-  isPaused: boolean;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const shadowRootRef = useRef<ShadowRoot | null>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    if (!shadowRootRef.current) {
-      shadowRootRef.current =
-        containerRef.current.shadowRoot ||
-        containerRef.current.attachShadow({ mode: "open" });
-    }
-    const root = shadowRootRef.current;
-    root.innerHTML = `
-      <style>
-        :host {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          box-sizing: border-box;
-        }
-        *, *::before, *::after {
-          box-sizing: border-box;
-        }
-        ${cssCode}
-        .preview-wrapper {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          height: 100%;
-          --anim-speed: ${speed}s;
-          --fire-duration: ${speed}s;
-          --run-speed: ${speed}s;
-          --speed: ${speed}s;
-          --duration: ${speed}s;
-          --anim-state: ${isPaused ? "paused" : "running"};
-        }
-        ${
-          isPaused
-            ? ".preview-wrapper, .preview-wrapper * { animation-play-state: paused !important; }"
-            : ""
-        }
-      </style>
-      <div class="preview-wrapper">
-        ${htmlCode}
-      </div>
-    `;
-  }, [cssCode, htmlCode, speed, isPaused]);
-
-  return <div ref={containerRef} className="preview-stage" />;
+  reactCode: string;
 }
 
-export function SnippetCard({
-  title,
-  category,
-  cssCode,
-  reactCode,
-  htmlCode,
-  defaultSpeed = 0.8,
-}: SnippetCardProps) {
-  const [speed, setSpeed] = useState(defaultSpeed);
-  const [isPaused, setIsPaused] = useState(false);
-  const [activeTab, setActiveTab] = useState<"css" | "html" | "react">("css");
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+export default function SnippetCard({ snippet }: { snippet: SnippetData }) {
+  const [speed, setSpeed] = useState<number>(snippet.defaultSpeed);
+  const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"css" | "react" | "html">("css");
+  const modalId = useId().replace(/:/g, "");
 
-  const effectiveHtml = htmlCode?.trim() || getFallbackHtml(title, category, cssCode);
-  const cleanCss = normalizeCss(cssCode);
-  const sliderMax = Math.max(4.0, Math.ceil(defaultSpeed * 2));
-
-  const handleCopy = async () => {
-    let textToCopy = cleanCss;
-    if (activeTab === "html") {
-      textToCopy = effectiveHtml;
-    } else if (activeTab === "react") {
-      textToCopy = reactCode;
-    }
-    await navigator.clipboard.writeText(textToCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  const getCodeForTab = () => {
-    if (activeTab === "css") return cleanCss;
-    if (activeTab === "html") return effectiveHtml;
-    return reactCode;
+  const copyToClipboard = (text: string, type: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedType(type);
+    setTimeout(() => setCopiedType(null), 2000);
   };
 
   return (
-    <article className="snippet-card">
-      <header className="card-header">
-        <div>
-          <span className="category-pill">{category}</span>
-          <h3 className="title">{title}</h3>
-        </div>
-
-        {/* Action Menu */}
-        <div className="menu-container">
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Snippet actions"
-          >
-            •••
-          </button>
-          {menuOpen && (
-            <div className="menu-dropdown">
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(cleanCss);
-                  setMenuOpen(false);
-                }}
-              >
-                Copy Raw CSS
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(effectiveHtml);
-                  setMenuOpen(false);
-                }}
-              >
-                Copy HTML
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(reactCode);
-                  setMenuOpen(false);
-                }}
-              >
-                Copy React / Mantine
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Animation Canvas */}
-      <ShadowPreviewStage
-        cssCode={cleanCss}
-        htmlCode={effectiveHtml}
-        speed={speed}
-        isPaused={isPaused}
+    <div className="card bg-base-100 border border-base-300 shadow-md hover:shadow-xl transition-all flex flex-col justify-between overflow-hidden">
+      {/* Dynamic Scoped Styles */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            #preview-${modalId} {
+              --fire-duration: ${speed}s;
+            }
+            ${snippet.cssCode}
+          `,
+        }}
       />
 
-      {/* Interactive Controls */}
-      <div className="control-bar">
-        <label className="slider-label">
-          <span>Speed: {speed}s</span>
+      {/* Header Info */}
+      <div className="p-4 border-b border-base-200 flex items-start justify-between">
+        <div>
+          <span className="badge badge-primary badge-sm font-semibold">
+            {snippet.category}
+          </span>
+          <h3 className="text-lg font-bold mt-1 text-base-content">
+            {snippet.title}
+          </h3>
+        </div>
+
+        {/* DaisyUI "..." Action Menu */}
+        <div className="dropdown dropdown-end">
+          <button
+            tabIndex={0}
+            className="btn btn-ghost btn-circle btn-sm text-base-content/70"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+              />
+            </svg>
+          </button>
+          <ul
+            tabIndex={0}
+            className="dropdown-content menu bg-base-200 rounded-box z-20 w-44 p-2 shadow-lg border border-base-300 text-sm"
+          >
+            <li>
+              <button onClick={() => copyToClipboard(snippet.htmlCode, "HTML")}>
+                Copy HTML
+              </button>
+            </li>
+            <li>
+              <button onClick={() => setSpeed(snippet.defaultSpeed)}>
+                Reset Speed
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Showcase / Canvas Preview */}
+      <div className="relative min-h-[180px] bg-base-200/50 flex items-center justify-center p-6 border-b border-base-200 group">
+        <div
+          id={`preview-${modalId}`}
+          className="transition-transform duration-300 group-hover:scale-110"
+          dangerouslySetInnerHTML={{ __html: snippet.htmlCode }}
+        />
+      </div>
+
+      {/* Card Controls & Footer */}
+      <div className="p-4 space-y-3">
+        {/* Speed Controller Slider */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-base-content/60 font-medium min-w-[42px]">
+            Speed
+          </span>
           <input
             type="range"
-            min="0.1"
-            max={sliderMax}
+            min="0.2"
+            max="4"
             step="0.1"
             value={speed}
             onChange={(e) => setSpeed(parseFloat(e.target.value))}
-            onInput={(e) => setSpeed(parseFloat((e.target as HTMLInputElement).value))}
+            className="range range-primary range-xs flex-1"
           />
-        </label>
-        <button
-          type="button"
-          className="toggle-btn"
-          onClick={() => setIsPaused(!isPaused)}
-        >
-          {isPaused ? "Resume" : "Pause"}
-        </button>
+          <span className="text-xs font-mono text-base-content/70 min-w-[32px] text-right">
+            {speed}s
+          </span>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between gap-2 pt-1">
+          {/* Quick Copy Dropdown */}
+          <div className="join">
+            <button
+              onClick={() => copyToClipboard(snippet.cssCode, "CSS")}
+              className="btn btn-sm btn-outline join-item"
+            >
+              {copiedType === "CSS" ? "Copied CSS!" : "Copy CSS"}
+            </button>
+            <button
+              onClick={() => copyToClipboard(snippet.reactCode, "React")}
+              className="btn btn-sm btn-outline join-item"
+            >
+              {copiedType === "React" ? "Copied React!" : "React"}
+            </button>
+          </div>
+
+          {/* Show Code Modal Trigger */}
+          <button
+            onClick={() => {
+              const modal = document.getElementById(
+                modalId
+              ) as HTMLDialogElement | null;
+              modal?.showModal();
+            }}
+            className="btn btn-sm btn-ghost text-primary"
+          >
+            Show Code
+          </button>
+        </div>
       </div>
 
-      {/* Code Inspector Tabs */}
-      <div className="code-panel">
-        <div className="tab-bar">
-          <div className="tabs">
+      {/* DaisyUI Code Modal */}
+      <dialog id={modalId} className="modal">
+        <div className="modal-box w-11/12 max-w-2xl bg-base-100">
+          <h3 className="font-bold text-lg mb-4">{snippet.title} — Code</h3>
+
+          {/* Tab Selection */}
+          <div className="tabs tabs-boxed mb-4 bg-base-200">
             <button
-              type="button"
-              className={activeTab === "css" ? "active" : ""}
+              className={`tab ${activeTab === "css" ? "tab-active" : ""}`}
               onClick={() => setActiveTab("css")}
             >
               CSS
             </button>
             <button
-              type="button"
-              className={activeTab === "html" ? "active" : ""}
+              className={`tab ${activeTab === "react" ? "tab-active" : ""}`}
+              onClick={() => setActiveTab("react")}
+            >
+              React Component
+            </button>
+            <button
+              className={`tab ${activeTab === "html" ? "tab-active" : ""}`}
               onClick={() => setActiveTab("html")}
             >
               HTML
             </button>
+          </div>
+
+          {/* Code Viewer */}
+          <div className="relative">
+            <pre className="bg-neutral text-neutral-content p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-72">
+              <code>
+                {activeTab === "css" && snippet.cssCode}
+                {activeTab === "react" && snippet.reactCode}
+                {activeTab === "html" && snippet.htmlCode}
+              </code>
+            </pre>
             <button
-              type="button"
-              className={activeTab === "react" ? "active" : ""}
-              onClick={() => setActiveTab("react")}
+              onClick={() => {
+                const text =
+                  activeTab === "css" ? snippet.cssCode
+                  : activeTab === "react" ? snippet.reactCode
+                  : snippet.htmlCode;
+                copyToClipboard(text, activeTab.toUpperCase());
+              }}
+              className="btn btn-xs btn-primary absolute top-2 right-2"
             >
-              React
+              {copiedType === activeTab.toUpperCase() ? "Copied!" : "Copy"}
             </button>
           </div>
 
-          <div className="tab-actions">
-            <button type="button" className="copy-action" onClick={handleCopy}>
-              {copied ? "Copied!" : `Copy ${activeTab.toUpperCase()}`}
-            </button>
-            <button
-              type="button"
-              className="expand-action"
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              {isExpanded ? "Collapse" : "Expand"}
-            </button>
+          <div className="modal-action">
+            <form method="dialog">
+              <button className="btn btn-sm">Close</button>
+            </form>
           </div>
         </div>
-
-        {isExpanded && (
-          <pre className="code-view">
-            <code>{getCodeForTab()}</code>
-          </pre>
-        )}
-      </div>
-    </article>
+      </dialog>
+    </div>
   );
 }
