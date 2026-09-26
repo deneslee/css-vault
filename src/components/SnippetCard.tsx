@@ -1,213 +1,316 @@
 // src/components/SnippetCard.tsx
-import React, { useState, useId } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  LANG_LABEL,
+  buildPreviewDocument,
+  defaultControlValues,
+  formatControlValue,
+  type CodeLang,
+  type SnippetData,
+} from "../lib/snippet";
+import type { Theme } from "./Navbar";
 
-export interface SnippetData {
-  id: string;
-  title: string;
-  category: string;
-  tags: string[];
-  defaultSpeed: number;
-  cssCode: string;
-  htmlCode: string;
-  reactCode: string;
+interface SnippetCardProps {
+  snippet: SnippetData;
+  theme: Theme;
+  activeTag: string | null;
+  onTagSelect: (tag: string) => void;
+  onCopied: (message: string) => void;
 }
 
-export default function SnippetCard({ snippet }: { snippet: SnippetData }) {
-  const [speed, setSpeed] = useState<number>(snippet.defaultSpeed);
-  const [copiedType, setCopiedType] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"css" | "react" | "html">("css");
-  const modalId = useId().replace(/:/g, "");
+const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
+const hoverQuery = "(hover: hover)";
 
-  const copyToClipboard = (text: string, type: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedType(type);
-    setTimeout(() => setCopiedType(null), 2000);
-  };
+export default function SnippetCard({ snippet, theme, activeTag, onTagSelect, onCopied }: SnippetCardProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  const [values, setValues] = useState(() => defaultControlValues(snippet));
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [canHover, setCanHover] = useState(true);
+  const [codeTab, setCodeTab] = useState<CodeLang>("css");
+  const [copied, setCopied] = useState<CodeLang | null>(null);
+
+  // Hovering (or focusing) the card plays it; the stage button keeps it
+  // playing, which is also how touch and reduced-motion users start it.
+  const playing = pinned || (hovered && !reducedMotion);
+
+  useEffect(() => {
+    const motion = window.matchMedia(reducedMotionQuery);
+    const hover = window.matchMedia(hoverQuery);
+    const update = () => {
+      setReducedMotion(motion.matches);
+      setCanHover(hover.matches);
+    };
+    update();
+    motion.addEventListener("change", update);
+    hover.addEventListener("change", update);
+    return () => {
+      motion.removeEventListener("change", update);
+      hover.removeEventListener("change", update);
+    };
+  }, []);
+
+  const srcDoc = useMemo(() => buildPreviewDocument(snippet), [snippet]);
+
+  // Push live state into the preview document. It's a same-origin srcdoc
+  // frame, so the parent can reach its DOM directly — no reload per change.
+  const syncPreview = useCallback(() => {
+    const frame = iframeRef.current;
+    const doc = frame?.contentDocument;
+    const root = doc?.querySelector<HTMLElement>(".preview-root");
+    if (!frame || !doc || !root) return;
+    for (const control of snippet.controls) {
+      root.style.setProperty(control.property, formatControlValue(control, values[control.property]));
+    }
+    root.classList.toggle("is-playing", playing);
+    // Plain text in a snippet should follow the site theme.
+    doc.body.style.color = getComputedStyle(frame).color;
+  }, [snippet.controls, values, playing]);
+
+  useEffect(() => {
+    syncPreview();
+  }, [syncPreview, theme]);
+
+  const codeFor = (lang: CodeLang) =>
+    lang === "css" ? snippet.cssCode : lang === "react" ? snippet.reactCode : snippet.htmlCode;
+
+  async function copy(lang: CodeLang) {
+    try {
+      await navigator.clipboard.writeText(codeFor(lang));
+      setCopied(lang);
+      onCopied(`Copied ${LANG_LABEL[lang]} for ${snippet.title}`);
+      window.setTimeout(() => setCopied((current) => (current === lang ? null : current)), 1800);
+    } catch {
+      onCopied("Copying failed. Your browser blocked clipboard access.");
+    }
+  }
+
+  const resetControls = () => setValues(defaultControlValues(snippet));
+  const isDirty = snippet.controls.some((c) => values[c.property] !== c.default);
 
   return (
-    <div className="card bg-base-100 border border-base-300 shadow-md hover:shadow-xl transition-all flex flex-col justify-between overflow-hidden">
-      {/* Dynamic Scoped Styles */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            #preview-${modalId} {
-              --fire-duration: ${speed}s;
-            }
-            ${snippet.cssCode}
-          `,
-        }}
-      />
-
-      {/* Header Info */}
-      <div className="p-4 border-b border-base-200 flex items-start justify-between">
-        <div>
-          <span className="badge badge-primary badge-sm font-semibold">
-            {snippet.category}
-          </span>
-          <h3 className="text-lg font-bold mt-1 text-base-content">
-            {snippet.title}
-          </h3>
+    <article
+      className="card border border-base-content/10 bg-base-100 shadow-md transition-[box-shadow,border-color] duration-200 hover:border-primary/40 hover:shadow-xl"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHovered(false);
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 px-5 pb-4 pt-5">
+        <div className="min-w-0">
+          <span className="badge badge-soft badge-primary badge-sm font-medium">{snippet.category}</span>
+          <h3 className="mt-2 text-lg font-semibold leading-snug">{snippet.title}</h3>
         </div>
 
-        {/* DaisyUI "..." Action Menu */}
         <div className="dropdown dropdown-end">
           <button
+            type="button"
             tabIndex={0}
-            className="btn btn-ghost btn-circle btn-sm text-base-content/70"
+            className="btn btn-ghost btn-circle btn-sm -mr-2 -mt-1"
+            aria-label={`More actions for ${snippet.title}`}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-              />
-            </svg>
+            <DotsIcon />
           </button>
           <ul
             tabIndex={0}
-            className="dropdown-content menu bg-base-200 rounded-box z-20 w-44 p-2 shadow-lg border border-base-300 text-sm"
+            className="menu dropdown-content z-20 mt-1 w-48 rounded-box border border-base-content/10 bg-base-100 p-2 shadow-xl"
           >
             <li>
-              <button onClick={() => copyToClipboard(snippet.htmlCode, "HTML")}>
+              <button type="button" onClick={() => copy("html")}>
                 Copy HTML
               </button>
             </li>
-            <li>
-              <button onClick={() => setSpeed(snippet.defaultSpeed)}>
-                Reset Speed
+            <li className={snippet.controls.length === 0 ? "menu-disabled" : undefined}>
+              <button type="button" onClick={resetControls} disabled={snippet.controls.length === 0}>
+                Reset controls
               </button>
             </li>
           </ul>
         </div>
       </div>
 
-      {/* Showcase / Canvas Preview */}
-      <div className="relative min-h-[180px] bg-base-200/50 flex items-center justify-center p-6 border-b border-base-200 group">
-        <div
-          id={`preview-${modalId}`}
-          className="transition-transform duration-300 group-hover:scale-110"
-          dangerouslySetInnerHTML={{ __html: snippet.htmlCode }}
+      {/* Stage */}
+      <div className="stage h-52 border-y border-base-content/10" data-playing={playing}>
+        <iframe
+          ref={iframeRef}
+          title={`${snippet.title} preview`}
+          srcDoc={srcDoc}
+          onLoad={syncPreview}
+          tabIndex={-1}
+          className="block h-full w-full border-0 bg-transparent"
+          style={{ colorScheme: "normal" }}
         />
+        <button
+          type="button"
+          onClick={() => setPinned((value) => !value)}
+          aria-pressed={pinned}
+          className="btn btn-xs absolute left-3 top-3 gap-2 border-base-content/10 bg-base-100/80 font-medium backdrop-blur"
+        >
+          <span className="live-dot" aria-hidden="true" />
+          {pinned ? "Pause" : playing ? "Playing" : reducedMotion || !canHover ? "Play" : "Hover to play"}
+        </button>
       </div>
 
-      {/* Card Controls & Footer */}
-      <div className="p-4 space-y-3">
-        {/* Speed Controller Slider */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-base-content/60 font-medium min-w-[42px]">
-            Speed
-          </span>
-          <input
-            type="range"
-            min="0.2"
-            max="4"
-            step="0.1"
-            value={speed}
-            onChange={(e) => setSpeed(parseFloat(e.target.value))}
-            className="range range-primary range-xs flex-1"
-          />
-          <span className="text-xs font-mono text-base-content/70 min-w-[32px] text-right">
-            {speed}s
-          </span>
-        </div>
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        {snippet.tags.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5" aria-label="Tags">
+            {snippet.tags.map((tag) => (
+              <li key={tag}>
+                <button
+                  type="button"
+                  onClick={() => onTagSelect(tag)}
+                  aria-pressed={activeTag === tag}
+                  className={`badge badge-sm cursor-pointer ${
+                    activeTag === tag ? "badge-primary" : "badge-ghost hover:badge-outline"
+                  }`}
+                >
+                  #{tag}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between gap-2 pt-1">
-          {/* Quick Copy Dropdown */}
+        {snippet.controls.length > 0 && (
+          <div className="space-y-2.5">
+            {snippet.controls.map((control) => {
+              const value = values[control.property];
+              const id = `${snippet.id}-${control.property}`;
+              return (
+                <div key={control.property} className="flex items-center gap-3">
+                  <label htmlFor={id} className="w-16 shrink-0 text-xs font-medium text-base-content/70">
+                    {control.label}
+                  </label>
+                  {control.type === "color" ? (
+                    <>
+                      <input
+                        id={id}
+                        type="color"
+                        value={value}
+                        onChange={(event) => setValues((prev) => ({ ...prev, [control.property]: event.target.value }))}
+                        className="h-7 w-10 cursor-pointer rounded-field border border-base-content/15 bg-transparent p-0.5"
+                      />
+                      <span className="font-mono text-xs uppercase text-base-content/60">{value}</span>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        id={id}
+                        type="range"
+                        min={control.min}
+                        max={control.max}
+                        step={control.step ?? 0.1}
+                        value={value}
+                        onChange={(event) => setValues((prev) => ({ ...prev, [control.property]: event.target.value }))}
+                        className="range range-primary range-xs flex-1"
+                      />
+                      <output htmlFor={id} className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-base-content/70">
+                        {formatControlValue(control, value)}
+                      </output>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
           <div className="join">
-            <button
-              onClick={() => copyToClipboard(snippet.cssCode, "CSS")}
-              className="btn btn-sm btn-outline join-item"
-            >
-              {copiedType === "CSS" ? "Copied CSS!" : "Copy CSS"}
+            <button type="button" onClick={() => copy("css")} className="btn btn-sm btn-outline join-item">
+              {copied === "css" ? "Copied" : "Copy CSS"}
             </button>
-            <button
-              onClick={() => copyToClipboard(snippet.reactCode, "React")}
-              className="btn btn-sm btn-outline join-item"
-            >
-              {copiedType === "React" ? "Copied React!" : "React"}
+            <button type="button" onClick={() => copy("react")} className="btn btn-sm btn-outline join-item">
+              {copied === "react" ? "Copied" : "React"}
             </button>
           </div>
-
-          {/* Show Code Modal Trigger */}
           <button
-            onClick={() => {
-              const modal = document.getElementById(
-                modalId
-              ) as HTMLDialogElement | null;
-              modal?.showModal();
-            }}
+            type="button"
+            onClick={() => dialogRef.current?.showModal()}
             className="btn btn-sm btn-ghost text-primary"
           >
-            Show Code
+            Show code
           </button>
         </div>
+        {isDirty && (
+          <p className="-mt-2 text-xs text-base-content/55">
+            Copied code keeps its original defaults. Your adjusted values only change this preview.
+          </p>
+        )}
       </div>
 
-      {/* DaisyUI Code Modal */}
-      <dialog id={modalId} className="modal">
-        <div className="modal-box w-11/12 max-w-2xl bg-base-100">
-          <h3 className="font-bold text-lg mb-4">{snippet.title} — Code</h3>
-
-          {/* Tab Selection */}
-          <div className="tabs tabs-boxed mb-4 bg-base-200">
-            <button
-              className={`tab ${activeTab === "css" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("css")}
-            >
-              CSS
-            </button>
-            <button
-              className={`tab ${activeTab === "react" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("react")}
-            >
-              React Component
-            </button>
-            <button
-              className={`tab ${activeTab === "html" ? "tab-active" : ""}`}
-              onClick={() => setActiveTab("html")}
-            >
-              HTML
-            </button>
-          </div>
-
-          {/* Code Viewer */}
-          <div className="relative">
-            <pre className="bg-neutral text-neutral-content p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-72">
-              <code>
-                {activeTab === "css" && snippet.cssCode}
-                {activeTab === "react" && snippet.reactCode}
-                {activeTab === "html" && snippet.htmlCode}
-              </code>
-            </pre>
-            <button
-              onClick={() => {
-                const text =
-                  activeTab === "css" ? snippet.cssCode
-                  : activeTab === "react" ? snippet.reactCode
-                  : snippet.htmlCode;
-                copyToClipboard(text, activeTab.toUpperCase());
-              }}
-              className="btn btn-xs btn-primary absolute top-2 right-2"
-            >
-              {copiedType === activeTab.toUpperCase() ? "Copied!" : "Copy"}
-            </button>
-          </div>
-
-          <div className="modal-action">
+      {/* Code dialog */}
+      <dialog ref={dialogRef} className="modal modal-bottom sm:modal-middle" aria-labelledby={`${snippet.id}-dialog-title`}>
+        <div className="modal-box w-full max-w-3xl p-0">
+          <div className="flex items-center justify-between gap-3 border-b border-base-content/10 px-5 py-4">
+            <div className="min-w-0">
+              <p className="text-xs text-base-content/60">{snippet.category}</p>
+              <h2 id={`${snippet.id}-dialog-title`} className="truncate text-lg font-semibold">
+                {snippet.title}
+              </h2>
+            </div>
             <form method="dialog">
-              <button className="btn btn-sm">Close</button>
+              <button className="btn btn-ghost btn-circle btn-sm" aria-label="Close">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
             </form>
           </div>
+
+          <div className="space-y-4 px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div role="tablist" className="tabs tabs-box tabs-sm">
+                {(["css", "react", "html"] as CodeLang[]).map((lang) => (
+                  <button
+                    key={lang}
+                    type="button"
+                    role="tab"
+                    aria-selected={codeTab === lang}
+                    className={`tab ${codeTab === lang ? "tab-active" : ""}`}
+                    onClick={() => setCodeTab(lang)}
+                  >
+                    {LANG_LABEL[lang]}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => copy(codeTab)} className="btn btn-primary btn-sm">
+                {copied === codeTab ? "Copied" : `Copy ${LANG_LABEL[codeTab]}`}
+              </button>
+            </div>
+
+            <div
+              role="tabpanel"
+              className="code-block overflow-hidden rounded-box border border-base-content/10"
+              dangerouslySetInnerHTML={{ __html: snippet.highlighted[codeTab] }}
+            />
+
+            {snippet.notesHtml && (
+              <div className="snippet-notes border-t border-base-content/10 pt-4" dangerouslySetInnerHTML={{ __html: snippet.notesHtml }} />
+            )}
+          </div>
         </div>
+        <form method="dialog" className="modal-backdrop">
+          <button aria-label="Close dialog">close</button>
+        </form>
       </dialog>
-    </div>
+    </article>
+  );
+}
+
+function DotsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="12" cy="5" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="12" cy="19" r="1.8" />
+    </svg>
   );
 }

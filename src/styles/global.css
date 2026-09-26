@@ -1,3 +1,236 @@
 /* src/styles/global.css */
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: false;
+}
+
+@import "@fontsource/space-grotesk/400.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/* Surfaces follow daisyUI's convention: base-100 is the raised surface
+   (cards, dialogs, inputs), base-200 the page, base-300 the deepest well
+   (the preview stage). */
+@plugin "daisyui/theme" {
+  name: "vault-dark";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #171c28;
+  --color-base-200: #10141d;
+  --color-base-300: #0a0d14;
+  --color-base-content: #e6e9f2;
+
+  --color-primary: #6b63ff;
+  --color-primary-content: #ffffff;
+  --color-secondary: #ff7a3d;
+  --color-secondary-content: #1f0b00;
+  --color-accent: #2dd4bf;
+  --color-accent-content: #032a25;
+  --color-neutral: #242b3b;
+  --color-neutral-content: #d5dae6;
+
+  --color-info: #60a5fa;
+  --color-info-content: #04172e;
+  --color-success: #34d399;
+  --color-success-content: #032418;
+  --color-warning: #fbbf24;
+  --color-warning-content: #2a1b00;
+  --color-error: #f87171;
+  --color-error-content: #2c0707;
+
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "vault-light";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #ffffff;
+  --color-base-200: #f1f2f7;
+  --color-base-300: #e2e5ee;
+  --color-base-content: #171b26;
+
+  --color-primary: #5046e5;
+  --color-primary-content: #ffffff;
+  --color-secondary: #e2561a;
+  --color-secondary-content: #ffffff;
+  --color-accent: #0f9f8c;
+  --color-accent-content: #ffffff;
+  --color-neutral: #262d3d;
+  --color-neutral-content: #f1f2f7;
+
+  --color-info: #2563eb;
+  --color-info-content: #ffffff;
+  --color-success: #059669;
+  --color-success-content: #ffffff;
+  --color-warning: #d97706;
+  --color-warning-content: #ffffff;
+  --color-error: #dc2626;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@theme {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer components {
+  /* The stage: a recessed well where each effect performs. A faint
+     transparency checkerboard (familiar from image editors, and honest about
+     what's transparent in a sprite) under a spotlight that brightens while
+     the snippet plays. */
+  .stage {
+    --checker: color-mix(in oklab, var(--color-base-content) 5%, transparent);
+    position: relative;
+    isolation: isolate;
+    background:
+      conic-gradient(var(--checker) 25%, transparent 0 50%, var(--checker) 0 75%, transparent 0)
+        0 0 / 16px 16px,
+      var(--color-base-300);
+    box-shadow:
+      inset 0 10px 24px -12px rgb(0 0 0 / 0.55),
+      inset 0 -1px 0 color-mix(in oklab, var(--color-base-content) 6%, transparent);
+  }
+
+  .stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(
+      ellipse 55% 65% at 50% 55%,
+      color-mix(in oklab, var(--color-primary) 28%, transparent),
+      transparent 70%
+    );
+    opacity: 0.35;
+    transition: opacity 0.4s ease;
+  }
+
+  .stage[data-playing="true"]::before {
+    opacity: 1;
+  }
+
+  [data-theme="vault-light"] .stage {
+    box-shadow:
+      inset 0 10px 24px -14px rgb(15 20 40 / 0.35),
+      inset 0 -1px 0 rgb(15 20 40 / 0.06);
+  }
+
+  .live-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+  }
+
+  [data-playing="true"] .live-dot {
+    background: var(--color-secondary);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-secondary) 60%, transparent);
+    animation: live-ping 1.4s ease-out infinite;
+  }
+
+  @keyframes live-ping {
+    to {
+      box-shadow: 0 0 0 6px transparent;
+    }
+  }
+
+  /* Shiki dual-theme output: each token carries both colors as variables;
+     the active daisyUI theme picks which one paints. */
+  .code-block .shiki {
+    max-height: 45vh;
+    margin: 0;
+    padding: 1rem 1.1rem;
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    tab-size: 2;
+    background-color: var(--shiki-dark-bg) !important;
+  }
+
+  .code-block .shiki span {
+    color: var(--shiki-dark);
+  }
+
+  [data-theme="vault-light"] .code-block .shiki {
+    background-color: var(--shiki-light-bg) !important;
+  }
+
+  [data-theme="vault-light"] .code-block .shiki span {
+    color: var(--shiki-light);
+  }
+
+  /* Rendered markdown notes in the code dialog. */
+  .snippet-notes {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+  }
+
+  .snippet-notes > * + * {
+    margin-top: 0.75rem;
+  }
+
+  .snippet-notes h1,
+  .snippet-notes h2,
+  .snippet-notes h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-base-content);
+  }
+
+  .snippet-notes ol {
+    list-style: decimal;
+    padding-left: 1.25rem;
+  }
+
+  .snippet-notes ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+  }
+
+  .snippet-notes li + li {
+    margin-top: 0.25rem;
+  }
+
+  .snippet-notes code {
+    font-family: var(--font-mono);
+    font-size: 0.8em;
+    padding: 0.1em 0.35em;
+    border-radius: 0.3rem;
+    background: color-mix(in oklab, var(--color-base-content) 9%, transparent);
+    color: var(--color-base-content);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage::before,
+  [data-playing="true"] .live-dot {
+    transition: none;
+    animation: none;
+  }
+}

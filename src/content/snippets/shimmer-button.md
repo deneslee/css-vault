@@ -2,16 +2,37 @@
 title: "Shimmer Button"
 category: "Buttons"
 tags: ["button", "shimmer", "gradient", "hover"]
-defaultSpeed: 2.0
+controls:
+  - label: "Speed"
+    property: "--anim-speed"
+    type: "range"
+    default: 2
+    min: 0.5
+    max: 5
+    step: 0.1
+    unit: "s"
+  - label: "Base"
+    property: "--shimmer-base"
+    type: "color"
+    default: "#1e293b"
+  - label: "Shine"
+    property: "--shimmer-shine"
+    type: "color"
+    default: "#475569"
 cssCode: |
   .shimmer-btn {
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    background: linear-gradient(110deg, #1e293b 8%, #334155 18%, #1e293b 33%);
+    background: linear-gradient(
+      110deg,
+      var(--shimmer-base, #1e293b) 8%,
+      var(--shimmer-shine, #475569) 18%,
+      var(--shimmer-base, #1e293b) 33%
+    );
     background-size: 200% 100%;
     color: #fff;
-    font-weight: 500;
+    font: 500 0.95rem/1 system-ui, sans-serif;
     cursor: pointer;
     animation: shine var(--anim-speed, 2s) linear infinite;
   }
@@ -22,26 +43,37 @@ cssCode: |
     }
   }
 htmlCode: |
-  <button class="shimmer-btn">Hover Me</button>
+  <button class="shimmer-btn">Hover me</button>
 reactCode: |
-  import React from 'react';
+  // ShimmerButton.tsx — put this snippet's CSS in ShimmerButton.css next to this file
+  import type { ButtonHTMLAttributes, CSSProperties } from 'react';
+  import './ShimmerButton.css';
 
-  interface ShimmerButtonProps {
-    children?: React.ReactNode;
+  interface ShimmerButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+    /** Seconds for one sweep of the shine. */
     speed?: number;
-    onClick?: () => void;
+    baseColor?: string;
+    shineColor?: string;
   }
 
   export function ShimmerButton({
-    children = 'Hover Me',
     speed = 2,
-    onClick,
+    baseColor = '#1e293b',
+    shineColor = '#475569',
+    style,
+    children = 'Hover me',
+    ...rest
   }: ShimmerButtonProps) {
     return (
       <button
         className="shimmer-btn"
-        style={{ '--anim-speed': `${speed}s` } as React.CSSProperties}
-        onClick={onClick}
+        style={{
+          ...style,
+          '--anim-speed': `${speed}s`,
+          '--shimmer-base': baseColor,
+          '--shimmer-shine': shineColor,
+        } as CSSProperties}
+        {...rest}
       >
         {children}
       </button>
@@ -49,6 +81,6 @@ reactCode: |
   }
 ---
 
-### Implementation Notes
+### Implementation notes
 
-Linear gradient with an angled shine highlight animated across 200% background width creates a smooth continuous shimmer effect.
+An angled linear gradient with a single bright band sits on a background twice the button's width. Sliding `background-position-x` across that width sweeps the band over the button in a continuous loop.

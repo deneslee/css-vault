@@ -1,48 +1,42 @@
 ---
 // src/layouts/Layout.astro
-import Navbar from "../components/Navbar.astro";
+import "../styles/global.css";
 
 interface Props {
   title?: string;
+  description?: string;
 }
 
-const { title = "CSS Vault" } = Astro.props;
+const {
+  title = "CSS Vault",
+  description = "A collection of CSS snippets — animations, sprites and UI effects you can preview, tune and copy as CSS, HTML or React.",
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="vault-dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <title>{title}</title>
+    <script is:inline>
+      // Runs before first paint so the page never flashes the wrong theme.
+      (function () {
+        var theme = "vault-dark";
+        try {
+          var stored = localStorage.getItem("css-vault-theme");
+          if (stored === "vault-dark" || stored === "vault-light") theme = stored;
+          else if (window.matchMedia("(prefers-color-scheme: light)").matches) theme = "vault-light";
+        } catch (e) {}
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
   </head>
-  <body>
-    <!-- Renders at top of every page using this layout -->
-    <Navbar title="CSS Vault" />
+  <body class="min-h-screen bg-base-200 text-base-content">
     <slot />
   </body>
 </html>
-
-<style is:global>
-  * {
-    box-sizing: border-box;
-  }
-
-  html,
-  body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    min-height: 100vh;
-    background-color: #0b0f19;
-    color: #e2e8f0;
-    font-family:
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Roboto,
-      sans-serif;
-  }
-</style>

@@ -1,102 +1,183 @@
 // src/components/SnippetGallery.tsx
-import React, { useState, useMemo } from "react";
-import SnippetCard, { type SnippetData } from "./SnippetCard";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Navbar, { type Theme } from "./Navbar";
+import SnippetCard from "./SnippetCard";
+import type { SnippetData } from "../lib/snippet";
 
-export default function SnippetGallery({
-  snippets,
-}: {
-  snippets: SnippetData[];
-}) {
+const GITHUB_URL = "https://github.com/deneslee/css-vault";
+
+function applyTheme(theme: Theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  try {
+    localStorage.setItem("css-vault-theme", theme);
+  } catch {
+    /* Storage unavailable: the theme still applies for this visit. */
+  }
+}
+
+export default function SnippetGallery({ snippets }: { snippets: SnippetData[] }) {
+  // Start from the server-rendered value so hydration matches; the effect
+  // below then adopts whatever the pre-paint script in Layout.astro chose.
+  const [theme, setTheme] = useState<Theme>("vault-dark");
   const [search, setSearch] = useState("");
-  const [selectedTag, setSelectedTag] = useState<string>("all");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (document.documentElement.getAttribute("data-theme") === "vault-light") setTheme("vault-light");
+  }, []);
+
+  // "/" focuses search from anywhere on the page.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.closest("input, textarea, select, [contenteditable='true']");
+      if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
-    snippets.forEach((s) => s.tags?.forEach((t) => tags.add(t)));
-    return ["all", ...Array.from(tags)];
+    for (const snippet of snippets) for (const tag of snippet.tags) tags.add(tag);
+    return Array.from(tags).sort();
   }, [snippets]);
 
-  const filteredSnippets = useMemo(() => {
-    return snippets.filter((s) => {
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return snippets.filter((snippet) => {
       const matchesSearch =
-        s.title.toLowerCase().includes(search.toLowerCase()) ||
-        s.category.toLowerCase().includes(search.toLowerCase());
-      const matchesTag = selectedTag === "all" || s.tags.includes(selectedTag);
+        !query ||
+        snippet.title.toLowerCase().includes(query) ||
+        snippet.category.toLowerCase().includes(query) ||
+        snippet.tags.some((tag) => tag.toLowerCase().includes(query.replace(/^#/, "")));
+      const matchesTag = !activeTag || snippet.tags.includes(activeTag);
       return matchesSearch && matchesTag;
     });
-  }, [snippets, search, selectedTag]);
+  }, [snippets, search, activeTag]);
+
+  function toggleTheme() {
+    const next: Theme = theme === "vault-dark" ? "vault-light" : "vault-dark";
+    applyTheme(next);
+    setTheme(next);
+  }
+
+  const selectTag = (tag: string | null) => setActiveTag((current) => (current === tag ? null : tag));
+  const clearFilters = () => {
+    setSearch("");
+    setActiveTag(null);
+  };
+
+  const filterActive = search.trim() !== "" || activeTag !== null;
 
   return (
-    <div className="min-h-screen bg-base-300/30 flex flex-col">
-      {/* DaisyUI Sticky Navbar with Search */}
-      <header className="sticky top-0 z-30 bg-base-100/90 backdrop-blur border-b border-base-300">
-        <div className="navbar max-w-7xl mx-auto px-4 gap-4">
-          <div className="flex-1">
-            <a
-              href="/"
-              className="btn btn-ghost text-xl font-bold tracking-tight"
-            >
-              ⚡ CSS<span className="text-primary">Vault</span>
-            </a>
-          </div>
+    <div className="flex min-h-screen flex-col">
+      <Navbar
+        search={search}
+        onSearchChange={setSearch}
+        searchRef={searchRef}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        githubUrl={GITHUB_URL}
+      />
 
-          <div className="flex-none gap-2 w-full max-w-xs md:max-w-sm">
-            <label className="input input-bordered input-sm flex items-center gap-2 w-full">
-              <input
-                type="text"
-                className="grow"
-                placeholder="Search snippets or categories..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 16 16"
-                fill="currentColor"
-                className="w-4 h-4 opacity-70"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </label>
+      <main id="snippets" className="mx-auto w-full max-w-7xl flex-1 scroll-mt-20 px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Snippets</h1>
+            <p className="mt-1 text-sm text-base-content/65" aria-live="polite">
+              {filterActive
+                ? `Showing ${filtered.length} of ${snippets.length}.`
+                : `${snippets.length} snippets. Hover a card, or press Play, to run its animation.`}
+            </p>
           </div>
+          {filterActive && (
+            <button type="button" onClick={clearFilters} className="btn btn-ghost btn-sm">
+              Clear filters
+            </button>
+          )}
         </div>
-      </header>
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 py-8 flex-1 w-full">
-        {/* Tag Filters */}
-        <div className="flex flex-wrap gap-2 mb-8">
+        <div className="mb-8 flex flex-wrap gap-2" role="group" aria-label="Filter by tag">
+          <button
+            type="button"
+            onClick={() => setActiveTag(null)}
+            aria-pressed={activeTag === null}
+            className={`badge badge-lg cursor-pointer ${activeTag === null ? "badge-primary" : "badge-outline hover:bg-base-100"}`}
+          >
+            #all
+          </button>
           {allTags.map((tag) => (
             <button
               key={tag}
-              onClick={() => setSelectedTag(tag)}
-              className={`badge badge-lg cursor-pointer transition-colors ${
-                selectedTag === tag ?
-                  "badge-primary text-primary-content"
-                : "badge-outline hover:bg-base-200"
-              }`}
+              type="button"
+              onClick={() => selectTag(tag)}
+              aria-pressed={activeTag === tag}
+              className={`badge badge-lg cursor-pointer ${activeTag === tag ? "badge-primary" : "badge-outline hover:bg-base-100"}`}
             >
               #{tag}
             </button>
           ))}
         </div>
 
-        {/* Snippet Grid */}
-        {filteredSnippets.length > 0 ?
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSnippets.map((snippet) => (
-              <SnippetCard key={snippet.id} snippet={snippet} />
+        {filtered.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((snippet) => (
+              <SnippetCard
+                key={snippet.id}
+                snippet={snippet}
+                theme={theme}
+                activeTag={activeTag}
+                onTagSelect={selectTag}
+                onCopied={(message) => setToast({ id: Date.now(), message })}
+              />
             ))}
           </div>
-        : <div className="text-center py-20 text-base-content/60">
-            <p className="text-lg">No CSS snippets match your search.</p>
+        ) : (
+          <div className="rounded-box border border-dashed border-base-content/20 px-6 py-16 text-center">
+            <p className="text-lg font-medium">No snippets match {search.trim() ? `“${search.trim()}”` : "this tag"}.</p>
+            <p className="mt-1 text-sm text-base-content/65">Try another word, or pick a different tag.</p>
+            <button type="button" onClick={clearFilters} className="btn btn-primary btn-sm mt-5">
+              Clear filters
+            </button>
           </div>
-        }
+        )}
       </main>
+
+      <footer id="about" className="scroll-mt-20 border-t border-base-content/10 bg-base-100">
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 md:grid-cols-[1fr_auto]">
+          <div className="max-w-2xl">
+            <h2 className="font-semibold">About CSS Vault</h2>
+            <p className="mt-2 text-sm leading-relaxed text-base-content/70">
+              A personal collection of CSS snippets: animations, sprite loops and small UI effects. Hover a card (or
+              press Play) to run its preview, adjust its controls to see how it responds, then copy it as CSS, HTML
+              or a React component. Press <kbd className="kbd kbd-xs">/</kbd> to search.
+            </p>
+          </div>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm self-start">
+            View source on GitHub
+          </a>
+        </div>
+      </footer>
+
+      {toast && (
+        <div className="toast toast-end toast-bottom z-50" role="status" key={toast.id}>
+          <div className="alert alert-success py-2 text-sm shadow-lg">
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

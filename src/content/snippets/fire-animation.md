@@ -2,7 +2,16 @@
 title: "60-Frame Fire Sprite Loop"
 category: "Sprites & Pixel Art"
 tags: ["fire", "sprite-sheet", "2d-grid", "steps"]
-defaultSpeed: 1.8
+previewScale: 2
+controls:
+  - label: "Duration"
+    property: "--fire-duration"
+    type: "range"
+    default: 1.8
+    min: 0.4
+    max: 4
+    step: 0.1
+    unit: "s"
 cssCode: |
   .pixel-fire {
     width: 64px;
@@ -26,34 +35,38 @@ cssCode: |
     to   { background-position-y: -384px; }
   }
 htmlCode: |
-  <div class="pixel-fire"></div>
+  <div class="pixel-fire" role="img" aria-label="Animated fire"></div>
 reactCode: |
-  import React from 'react';
-  import { Box } from '@mantine/core';
-  import classes from './FireSprite.module.css';
+  // FireSprite.tsx — put this snippet's CSS in FireSprite.css next to this file
+  import type { CSSProperties } from 'react';
+  import './FireSprite.css';
 
-  interface FireProps {
+  interface FireSpriteProps {
+    /** Seconds for one full pass through all 60 frames. */
     duration?: number;
     scale?: number;
   }
 
-  export function FireSprite({ duration = 1.8, scale = 1 }: FireProps) {
+  export function FireSprite({ duration = 1.8, scale = 1 }: FireSpriteProps) {
     return (
-      <Box
-        className={classes.pixelFire}
+      <div
+        className="pixel-fire"
+        role="img"
+        aria-label="Animated fire"
         style={{
           '--fire-duration': `${duration}s`,
           transform: `scale(${scale})`,
-          transformOrigin: 'center center',
-        } as React.CSSProperties}
+        } as CSSProperties}
       />
     );
   }
 ---
 
-### Implementation Details
+### Implementation details
 
-This sheet uses a 10×6 grid (60 frames). Rather than splitting the sprite into a 3,840px single-row strip, CSS runs two simultaneous `steps()` animations:
+This sheet is a 10×6 grid (60 frames). Rather than splitting it into a 3,840px single-row strip, CSS runs two `steps()` animations at once:
 
-1. `fire-x` iterates through the 10 horizontal frames in 1/6th of the total duration.
-2. `fire-y` shifts down by 64px every time `fire-x` completes one row cycle.
+1. `fire-x` steps through the 10 frames of a row in 1/6 of the total duration.
+2. `fire-y` moves down one 64px row each time `fire-x` finishes a row.
+
+Both read `--fire-duration`, so one variable keeps them in sync.

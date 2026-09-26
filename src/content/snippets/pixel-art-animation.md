@@ -2,7 +2,16 @@
 title: "Pixel Art Sprite Runner"
 category: "Sprites & Pixel Art"
 tags: ["pixel-art", "steps", "animation"]
-defaultSpeed: 0.8
+previewScale: 2
+controls:
+  - label: "Cycle"
+    property: "--run-speed"
+    type: "range"
+    default: 0.8
+    min: 0.2
+    max: 2
+    step: 0.05
+    unit: "s"
 cssCode: |
   .pixel-runner {
     width: 64px;
@@ -18,26 +27,29 @@ cssCode: |
     }
   }
 htmlCode: |
-  <div class="pixel-runner"></div>
+  <div class="pixel-runner" role="img" aria-label="Running character"></div>
 reactCode: |
-  import React from 'react';
-  import { Box } from '@mantine/core';
-  import classes from './PixelRunner.module.css';
+  // PixelRunner.tsx — put this snippet's CSS in PixelRunner.css next to this file
+  import type { CSSProperties } from 'react';
+  import './PixelRunner.css';
 
-  interface RunnerProps {
+  interface PixelRunnerProps {
+    /** Seconds for one full 8-frame run cycle. */
     speed?: number;
   }
 
-  export function PixelRunner({ speed = 0.8 }: RunnerProps) {
+  export function PixelRunner({ speed = 0.8 }: PixelRunnerProps) {
     return (
-      <Box
-        className={classes.pixelRunner}
-        style={{ '--run-speed': `${speed}s` } as React.CSSProperties}
+      <div
+        className="pixel-runner"
+        role="img"
+        aria-label="Running character"
+        style={{ '--run-speed': `${speed}s` } as CSSProperties}
       />
     );
   }
 ---
 
-### Implementation Notes
+### Implementation notes
 
-Using `steps(8)` ensures the background shifts discretely across each sprite frame rather than interpolating linearly. The `--run-speed` CSS custom property makes dynamic speed alterations effortless in React without touching keyframes.
+`steps(8)` moves the background in whole-frame jumps instead of sliding it smoothly, so each of the 8 frames shows crisply. The `--run-speed` custom property changes the pace without touching the keyframes.
