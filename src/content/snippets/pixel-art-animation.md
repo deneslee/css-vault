@@ -6,6 +6,7 @@ previewScale: 2
 controls:
   - label: "Cycle"
     property: "--run-speed"
+    reactProp: "speed"
     type: "range"
     default: 0.8
     min: 0.2

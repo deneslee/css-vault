@@ -5,6 +5,7 @@ tags: ["button", "shimmer", "gradient", "hover"]
 controls:
   - label: "Speed"
     property: "--anim-speed"
+    reactProp: "speed"
     type: "range"
     default: 2
     min: 0.5
@@ -13,10 +14,12 @@ controls:
     unit: "s"
   - label: "Base"
     property: "--shimmer-base"
+    reactProp: "baseColor"
     type: "color"
     default: "#1e293b"
   - label: "Shine"
     property: "--shimmer-shine"
+    reactProp: "shineColor"
     type: "color"
     default: "#475569"
 cssCode: |

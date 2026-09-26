@@ -184,6 +184,16 @@
     color: var(--shiki-light);
   }
 
+  /* Popover panels (Popover.tsx). The UA centres [popover] in the viewport;
+     JS sets top/left next to the trigger instead. On phones it docks to the
+     bottom as a sheet. */
+  .popover-panel {
+    position: fixed;
+    inset: auto;
+    max-height: min(70vh, 32rem);
+    overflow: auto;
+  }
+
   /* Rendered markdown notes in the code dialog. */
   .snippet-notes {
     font-size: 0.875rem;
@@ -225,6 +235,31 @@
     background: color-mix(in oklab, var(--color-base-content) 9%, transparent);
     color: var(--color-base-content);
   }
+}
+
+/* Phone bottom sheet. Deliberately outside @layer: it must override the
+   Tailwind width utility (e.g. w-80) that sizes the panel on larger screens. */
+.popover-panel[data-sheet="true"] {
+  width: 100%;
+  max-width: none;
+  border-radius: var(--radius-box) var(--radius-box) 0 0;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+}
+
+.popover-sheet-header {
+  display: none;
+}
+
+.popover-panel[data-sheet="true"] .popover-sheet-header {
+  display: flex;
+}
+
+.popover-panel::backdrop {
+  background: transparent;
+}
+
+.popover-panel[data-sheet="true"]::backdrop {
+  background: rgb(0 0 0 / 0.35);
 }
 
 @media (prefers-reduced-motion: reduce) {

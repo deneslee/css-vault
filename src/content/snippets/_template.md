@@ -8,11 +8,20 @@ tags: ["example", "animation"]
 # Optional: zoom the live preview (handy for 32–64px sprites). Default 1.
 previewScale: 1
 
+# Optional: for scroll-driven animations (animation-timeline: scroll()).
+# The preview becomes a tall mock page that auto-scrolls while playing.
+previewScroll: false
+
 # Optional: live controls. Each one drives a CSS custom property that your
-# cssCode reads with var(--name, fallback).
+# cssCode reads with var(--name, fallback). Always give var() a fallback:
+# Copy rewrites that fallback to the value the visitor tuned.
+# The first control (or the one with primary: true) sits on the card; the
+# rest open from the card's "Adjust" button and in the Open dialog.
 controls:
   - label: "Speed"
     property: "--pulse-speed"
+    reactProp: "speed" # optional: prop in reactCode whose default gets the tuned value
+    primary: true      # optional: this one is shown on the card
     type: "range"      # range | color
     default: 1
     min: 0.2

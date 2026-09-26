@@ -6,6 +6,7 @@ previewScale: 2
 controls:
   - label: "Duration"
     property: "--fire-duration"
+    reactProp: "duration"
     type: "range"
     default: 1.8
     min: 0.4
