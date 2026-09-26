@@ -13,4 +13,6 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
   },
+  site: 'https://deneslee.github.io',
+  base: '/css-vault',
 });
